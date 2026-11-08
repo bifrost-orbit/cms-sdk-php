@@ -8,6 +8,7 @@ use BifrostOrbit\Cms\Exception\AuthException;
 use BifrostOrbit\Cms\Exception\CmsException;
 use BifrostOrbit\Cms\Exception\NotFoundException;
 use BifrostOrbit\Cms\Exception\RateLimitException;
+use BifrostOrbit\Cms\Exception\SubscriptionInactiveException;
 use BifrostOrbit\Cms\Exception\UnavailableException;
 use BifrostOrbit\Cms\Http\CurlTransport;
 use BifrostOrbit\Cms\Http\HttpRequest;
@@ -31,7 +32,7 @@ use Psr\Http\Message\StreamFactoryInterface;
  */
 final class Client
 {
-    public const VERSION = '0.1.0';
+    public const VERSION = '0.2.0';
     public const DEFAULT_BASE_URL = 'https://api.bifrostorbit.com/cms';
 
     private const RETRY_DELAYS_MS = [250, 750, 2000];
@@ -143,7 +144,7 @@ final class Client
      * One page by its address. Throws {@see NotFoundException} when nothing is published there.
      *
      * @param array{region?: string|null, locale?: string|null, preview?: bool, strict?: bool, include?: list<'references'>} $options
-     * @return array<string, mixed> The page, with `meta`
+     * @return array<string, mixed> The page, with `meta`, and with `id` and `insights` from CMS Orbit versions that send them
      */
     public function getPage(string $path, array $options = []): array
     {
@@ -472,6 +473,9 @@ final class Client
         if ($response->status === 401) {
             throw new AuthException($message ?? 'The API key was refused');
         }
+        if ($response->status === 402) {
+            throw new SubscriptionInactiveException();
+        }
         if ($response->status === 429) {
             throw new RateLimitException($message ?? 'Too many requests', self::retryAfter($response));
         }
@@ -578,6 +582,9 @@ final class Client
             }
             if ($response->status === 404) {
                 throw new NotFoundException($message);
+            }
+            if ($response->status === 402) {
+                throw new SubscriptionInactiveException();
             }
             if ($response->status === 429) {
                 throw new RateLimitException($message, self::retryAfter($response));

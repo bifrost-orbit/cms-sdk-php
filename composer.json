@@ -10,7 +10,7 @@
         "bifrost-orbit",
         "delivery-api"
     ],
-    "homepage": "https://docs.bifrostorbit.com/cms/developers/sdk-php",
+    "homepage": "https://docs.bifrostorbit.com/cms/developers/sdk-php/",
     "require": {
         "php": ">=8.1",
         "ext-json": "*",
@@ -44,7 +44,7 @@
     "minimum-stability": "stable",
     "support": {
         "source": "https://github.com/bifrost-orbit/cms-sdk-php",
-        "docs": "https://docs.bifrostorbit.com/cms/developers/sdk-php",
+        "docs": "https://docs.bifrostorbit.com/cms/developers/sdk-php/",
         "email": "support@bifrostorbit.com"
     }
 }

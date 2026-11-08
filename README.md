@@ -4,13 +4,15 @@ The official PHP SDK for CMS Orbit. It reads content from the delivery API: page
 
 It works with any PHP website, including Laravel, Symfony, WordPress and plain PHP. It is open source under the MIT licence.
 
-Full documentation: [docs.bifrostorbit.com/cms/developers/sdk-php](https://docs.bifrostorbit.com/cms/developers/sdk-php).
+Full documentation: [docs.bifrostorbit.com/cms/developers/sdk-php](https://docs.bifrostorbit.com/cms/developers/sdk-php/).
 
 ## Install
 
 ```bash
 composer require bifrost-orbit/cms-sdk
 ```
+
+The package is [`bifrost-orbit/cms-sdk` on Packagist](https://packagist.org/packages/bifrost-orbit/cms-sdk), where you can see the latest version.
 
 It needs PHP 8.1 or later and `ext-json`. Requests go through `ext-curl` when it is installed and PHP streams when it is not, so there is nothing else to install. To use your own HTTP client, pass any PSR-18 client.
 
@@ -23,7 +25,7 @@ Create the keys in **Configuration › API keys**: a public key (`cms_pk_…`) f
 CMS_API_URL=https://api.bifrostorbit.com/cms
 CMS_PUBLIC_KEY=cms_pk_...
 CMS_PREVIEW_KEY=cms_sk_...      # staging only
-CMS_DEFAULT_REGION=ireland
+CMS_DEFAULT_REGION=germany
 ```
 
 ```php
@@ -33,13 +35,13 @@ $cms = new Client(
     apiKey: getenv('CMS_PUBLIC_KEY'),
     baseUrl: getenv('CMS_API_URL'),
     previewKey: getenv('CMS_PREVIEW_KEY') ?: null,
-    defaultRegion: 'ireland',
+    defaultRegion: 'germany',
 );
 
 // or, reading CMS_API_URL, CMS_PUBLIC_KEY, CMS_PREVIEW_KEY and CMS_DEFAULT_REGION:
 $cms = Client::fromEnvironment();
 
-$result = $cms->resolve('/services/consultations');
+$result = $cms->resolve('/gear/fjell-gtx-boot');
 
 if ($result['kind'] === 'page') {
     echo $result['page']['name'];
@@ -61,9 +63,10 @@ if ($result['kind'] === 'page') {
 
 ## Answers
 
-Every method answers with plain associative arrays, in the same shapes as the [delivery API](https://docs.bifrostorbit.com/cms/developers/delivery-api) and the JavaScript SDK. The PHPDoc on each method describes the shape, so PHPStan, Psalm and your editor know the keys.
+Every method answers with plain associative arrays, in the same shapes as the [delivery API](https://docs.bifrostorbit.com/cms/developers/delivery-api/) and the JavaScript SDK. The PHPDoc on each method describes the shape, so PHPStan, Psalm and your editor know the keys.
 
 - Pages gain a `meta` array: `region`, `locale`, `requestedRegion`, `requestedLocale`, `fallbackApplied`, `regionFallbackApplied`, `draft` and `references`.
+- Pages carry `id`, the entry's id, and `insights`, `['site' => '…']` when the space is connected to Insights Orbit or `null`. Pages from an older CMS Orbit have neither key.
 - `resolve()` answers `['kind' => 'page', 'page' => …]`, `['kind' => 'redirect', 'to' => …, 'status' => 301, 'permanent' => true, 'hops' => 1]`, `['kind' => 'gone']` or `['kind' => 'notFound']`.
 - JSON objects with no keys, such as a component's empty `children`, arrive as empty arrays.
 
@@ -91,12 +94,12 @@ Every method that reads content takes `region` and `locale`, and `preview` where
 
 ```php
 $header = $cms->getNavigation('header');
-$footer = $cms->getGlobal('footer', ['region' => 'uk']);
+$footer = $cms->getGlobal('footer', ['region' => 'ch']);
 $articles = $cms->list('article', ['sort' => '-publishedAt', 'perPage' => 12]);
 $faqs = $cms->list('faqEntry', ['category' => 'pricing', 'include' => ['fields']]);
-$treatments = $cms->list('treatment', ['filter' => ['duration' => '60']]);
+$products = $cms->list('product', ['filter' => ['activity' => 'hiking']]);
 $page = $cms->getPage('/pricing', ['include' => ['references']]);
-$banners = $cms->getBanners('/services/consultations', ['loggedIn' => false]);
+$banners = $cms->getBanners('/gear/fjell-gtx-boot', ['loggedIn' => false]);
 $data = $cms->graphql('query ($url: String!) { page(url: $url) { name } }', ['variables' => ['url' => '/']]);
 ```
 
@@ -190,6 +193,18 @@ A component with no renderer draws nothing. Pass a second argument, such as `fn 
 
 `Images::url($url, width: 960, format: 'webp')` and `Images::srcSet($url, $width)` give resized addresses for uploaded images.
 
+## Insights Orbit
+
+`Insights::tags($page)` prints the Insights Orbit script with the page's site key and `<meta name="insights-content">` with its entry id, or nothing when the space is not connected:
+
+```php
+use BifrostOrbit\Cms\Insights;
+
+echo Insights::tags($page, ['src' => '/stats/script.js', 'api' => '/stats/collect']);
+```
+
+It takes `site`, `contentId`, `src`, `api`, `disable`, `campaigns` and `waitForConsent`, like `CmsInsights` in the JavaScript SDK.
+
 ## Preview
 
 The editor opens your website at the space's Preview URL with `?preview=<token>`. Check the token, remember that the visitor is previewing, and read with `'preview' => true` while they are:
@@ -197,7 +212,7 @@ The editor opens your website at the space's Preview URL with `?preview=<token>`
 ```php
 use BifrostOrbit\Cms\Preview;
 
-// /preview?preview=…&path=/services/consultations
+// /preview?preview=…&path=/gear/fjell-gtx-boot
 $token = $cms->verifyPreviewToken($_GET['preview'] ?? $_GET['token'] ?? '');
 if ($token === null) {
     http_response_code(401);
@@ -226,12 +241,12 @@ if ($message === null) {
     http_response_code(401);
     exit;
 }
-$tags = Webhook::tagsForEvent($message['event'], $message['data']);  // such as ['cms:page:ireland:/pricing', 'cms:list', …]
+$tags = Webhook::tagsForEvent($message['event'], $message['data']);  // such as ['cms:page:germany:/pricing', 'cms:list', …]
 // clear the cache entries tagged with $tags, then:
 http_response_code(204);
 ```
 
-`Webhook::verify()` checks the HMAC-SHA256 signature and refuses messages over 5 minutes old. `CacheTags` gives the same tags the JavaScript SDK uses, for tag-aware caches.
+`Webhook::verify()` checks the HMAC-SHA256 signature and refuses messages over 5 minutes old. `CacheTags` gives the same tags the JavaScript SDK uses, for tag-aware caches. Symfony Cache refuses `:` and `/` in tags and keys, so pass them through `CacheTags::safe()` or `CacheTags::safeAll()` there, both when you store an answer and when the webhook clears it.
 
 ## Sitemaps and robots
 
@@ -239,7 +254,7 @@ http_response_code(204);
 use BifrostOrbit\Cms\Seo;
 
 header('Content-Type: application/xml; charset=utf-8');
-echo Seo::sitemapXml($cms->getSitemap(['region' => 'ireland', 'page' => 1]));
+echo Seo::sitemapXml($cms->getSitemap(['region' => 'germany', 'page' => 1]));
 echo Seo::sitemapIndexXml($cms->getSitemapIndex());
 
 header('Content-Type: text/plain; charset=utf-8');
@@ -256,7 +271,8 @@ Failed calls throw `BifrostOrbit\Cms\Exception\CmsException`, or one of its kind
 | --- | --- |
 | `NotFoundException` | Nothing is published there, or no menu, global entry, taxonomy, region or language has that key (404) |
 | `AuthException` | No key, a wrong or expired key, a public key asking for drafts, or a region or language the key may not read (401) |
-| `RateLimitException` | Over 15,000 requests a minute. `retryAfter` is the number of seconds to wait. Not retried. (429) |
+| `SubscriptionInactiveException` | The organisation's CMS Orbit trial or plan has ended, so delivery is paused. Not retried. (402) |
+| `RateLimitException` | Over the rate limit: 60,000 requests a minute per key, 15,000 per visitor IP address. `retryAfter` is the number of seconds to wait. Not retried. (429) |
 | `UnavailableException` | The CMS could not be reached, did not answer in time, or failed on its side, after every retry |
 | `CmsException` | Anything else, such as an unknown `sort` (400) |
 
@@ -276,6 +292,8 @@ try {
     exit;
 }
 ```
+
+When your organisation's CMS Orbit trial or plan has ended, delivery is paused: every call throws `SubscriptionInactiveException` (status `402`, `errorCode` `subscription_inactive`) straight away, without retrying, whatever code the API sends. Catch it and show your own calm "temporarily unavailable" page, with a `503` status so search engines come back later. Pages you have cached keep working until the cache runs out. Nothing is deleted, and content comes back as soon as an owner chooses a plan.
 
 ## Laravel
 
@@ -329,6 +347,24 @@ public function show(Client $cms, ?string $path = null)
 Route::get('/{path?}', [PageController::class, 'show'])->where('path', '.*');
 ```
 
+To clear only what changed when editors publish, use a cache store that holds tags, such as Redis or Memcached. Store each answer under `CacheTags::ALL` and its own tag, and flush the tags the webhook names:
+
+```php
+use BifrostOrbit\Cms\CacheTags;
+use BifrostOrbit\Cms\Webhook;
+
+$tags = [CacheTags::ALL, CacheTags::page(config('services.cms.region'), '/' . $path)];
+$result = Cache::tags($tags)->remember('cms:page:/' . $path, 60, $load);
+
+// in the webhook, after Webhook::parse:
+$tags = Webhook::tagsForEvent($message['event'], $message['data']);
+if ($tags !== []) {
+    Cache::tags($tags)->flush();
+}
+```
+
+The `file` and `database` stores cannot hold tags. With them, give CMS answers a store of their own in `config/cache.php`, such as `'cms' => ['driver' => 'file', 'path' => storage_path('framework/cache/cms')]`, read through `Cache::store('cms')`, and empty it with `Cache::store('cms')->flush()` whenever `tagsForEvent` answers with any tags.
+
 ## Symfony
 
 ```yaml
@@ -344,20 +380,40 @@ services:
 
 To send requests through Symfony HttpClient, add `$httpClient: '@Psr\Http\Client\ClientInterface'` with `$requestFactory` and `$streamFactory` set to a PSR-17 factory, such as `nyholm/psr7`'s `Psr17Factory`.
 
+```yaml
+# config/packages/cache.yaml
+framework:
+    cache:
+        pools:
+            cms.cache:
+                adapter: cache.adapter.filesystem
+                tags: true
+```
+
 ```php
 // src/Controller/PageController.php
+use BifrostOrbit\Cms\CacheTags;
 use BifrostOrbit\Cms\Client;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\Cache\TagAwareCacheInterface;
 
 final class PageController extends AbstractController
 {
     #[Route('/{path}', requirements: ['path' => '.*'], priority: -100)]
-    public function show(Client $cms, string $path = ''): Response
+    public function show(Client $cms, TagAwareCacheInterface $cmsCache, string $path = ''): Response
     {
-        $result = $cms->resolve('/' . $path);
+        $path = '/' . $path;
+        $tag = CacheTags::page((string) $cms->defaultRegion, $path);
+        $result = $cmsCache->get(CacheTags::safe($tag), function (ItemInterface $item) use ($cms, $path, $tag) {
+            $item->expiresAfter(60);
+            $item->tag(CacheTags::safeAll([CacheTags::ALL, $tag]));
+
+            return $cms->resolve($path);
+        });
 
         return match ($result['kind']) {
             'redirect' => new RedirectResponse($result['to'], $result['status']),
@@ -367,6 +423,13 @@ final class PageController extends AbstractController
         };
     }
 }
+```
+
+In the webhook, clear the same encoded tags:
+
+```php
+$message = Webhook::parse($secret, $request->headers->all(), $request->getContent());
+$cmsCache->invalidateTags(CacheTags::safeAll(Webhook::tagsForEvent($message['event'], $message['data'])));
 ```
 
 ## Tests

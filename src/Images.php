@@ -9,7 +9,7 @@ namespace BifrostOrbit\Cms;
  */
 final class Images
 {
-    private const SRCSET_WIDTHS = [640, 960, 1280, 1920];
+    private const SRCSET_WIDTHS = [320, 480, 640, 768, 960, 1280, 1600, 1920];
 
     /**
      * @param 'webp'|'avif'|null $format
